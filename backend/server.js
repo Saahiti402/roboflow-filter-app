@@ -1,5 +1,5 @@
 // -----------------------------
-// server.js
+// server.js (FINAL)
 // -----------------------------
 require("dotenv").config();
 const express = require("express");
@@ -7,16 +7,16 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 
-const {
-  fetchProjectInfo,
-  normalizeImage,
-} = require("./roboflow");
+const { normalizeImage } = require("./roboflow");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
+
+// 🔥 IMPORTANT: Dynamic base URL (fixes Vercel issue)
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 // -----------------------------
 // SERVE DATASET
@@ -36,8 +36,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 let cocoData = null;
 
 function loadCocoAnnotations() {
-  console.log("📂 Looking for dataset at:", path.join(process.cwd(), "train"));
   const filePath = path.join(process.cwd(), "train/_annotations.coco.json");
+
+  console.log("📂 Looking for dataset at:", path.join(process.cwd(), "train"));
 
   if (!fs.existsSync(filePath)) {
     console.error("❌ COCO file not found");
@@ -81,7 +82,7 @@ function getAnnotationsForImage(filename) {
 }
 
 // -----------------------------
-// LOAD IMAGES (WITH ANNOTATIONS)
+// LOAD IMAGES
 // -----------------------------
 async function getCachedImages() {
   if (imageCache && Date.now() - cacheTime < CACHE_TTL_MS) {
@@ -91,7 +92,7 @@ async function getCachedImages() {
   const basePath = path.join(process.cwd(), "train");
 
   if (!fs.existsSync(basePath)) {
-    console.error("Dataset not found:", basePath);
+    console.error("❌ Dataset not found:", basePath);
     return [];
   }
 
@@ -103,7 +104,11 @@ async function getCachedImages() {
       const normalized = normalizeImage({
         id: `train-${index}`,
         name: file,
-        image: `http://localhost:${PORT}/dataset/${file}`,
+
+        // 🔥 FIXED URL (production-safe)
+        image: `${BASE_URL}/dataset/${file}`,
+        thumb: `${BASE_URL}/dataset/${file}`,
+
         split: "train",
       });
 
@@ -111,7 +116,7 @@ async function getCachedImages() {
 
       return {
         ...normalized,
-        annotations, // 🔥 attach annotations here
+        annotations,
       };
     });
 
@@ -143,7 +148,7 @@ app.get("/api/images", async (req, res) => {
       tag,
       split,
       search,
-      object, // 🔥 NEW
+      object,
       sortBy = "name",
       order = "asc",
       page = 1,
@@ -177,9 +182,7 @@ app.get("/api/images", async (req, res) => {
       );
     }
 
-    // -----------------------------
-    // 🔥 OBJECT-BASED SEARCH
-    // -----------------------------
+    // 🔥 OBJECT SEARCH
     if (object) {
       const targets = object
         .split(",")
@@ -245,7 +248,7 @@ app.get("/api/images/:id", async (req, res) => {
       return res.status(404).json({ error: "Image not found" });
     }
 
-    res.json(image); // annotations already included
+    res.json(image);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
