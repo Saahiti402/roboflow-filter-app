@@ -1,6 +1,4 @@
-// -----------------------------
-// server.js (FINAL)
-// -----------------------------
+// server.js (FINAL - FIXED)
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -15,7 +13,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
 
-// 🔥 IMPORTANT: Dynamic base URL (fixes Vercel issue)
+// 🔥 FIX: dynamic base URL (for Render)
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 // -----------------------------
@@ -105,7 +103,7 @@ async function getCachedImages() {
         id: `train-${index}`,
         name: file,
 
-        // 🔥 FIXED URL (production-safe)
+        // 🔥 FIXED URL (IMPORTANT)
         image: `${BASE_URL}/dataset/${file}`,
         thumb: `${BASE_URL}/dataset/${file}`,
 
@@ -131,7 +129,6 @@ async function getCachedImages() {
 // -----------------------------
 // ROUTES
 // -----------------------------
-
 app.get("/", (req, res) => {
   res.json({ message: "🚀 API running" });
 });
@@ -156,7 +153,7 @@ app.get("/api/images", async (req, res) => {
     } = req.query;
 
     // -----------------------------
-    // FILTERS
+    // BASIC FILTERS
     // -----------------------------
     if (timeOfDay) {
       images = images.filter((img) => img.timeOfDay === timeOfDay);
@@ -182,19 +179,28 @@ app.get("/api/images", async (req, res) => {
       );
     }
 
-    // 🔥 OBJECT SEARCH
+    // -----------------------------
+    // 🔥 OBJECT SEARCH (FIXED)
+    // -----------------------------
     if (object) {
       const targets = object
         .split(",")
         .map((o) => o.trim().toLowerCase());
 
-      images = images.filter((img) =>
-        targets.every((t) =>
-          img.annotations.some((ann) =>
-            ann.label.toLowerCase().includes(t)
+      images = images.filter((img) => {
+        if (!img.annotations || img.annotations.length === 0) return false;
+
+        const labels = img.annotations.map((ann) =>
+          ann.label.toLowerCase()
+        );
+
+        return targets.some((target) =>
+          labels.some(
+            (label) =>
+              label === target || label.includes(target)
           )
-        )
-      );
+        );
+      });
     }
 
     // -----------------------------
